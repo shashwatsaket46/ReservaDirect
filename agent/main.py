@@ -284,3 +284,11 @@ app.include_router(google_router)
 
 from agent.tools.calendar_booking import router as booking_router
 app.include_router(booking_router)
+
+from agent.webhooks.calendar_listener import router as calendar_listener_router
+
+app.include_router(calendar_listener_router)
+
+from agent.webhooks.calendar_watch_api import router as calendar_watch_router
+
+app.include_router(calendar_watch_router)

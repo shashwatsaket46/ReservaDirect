@@ -38,7 +38,7 @@ def book_table(
     }
 
     created_event = service.events().insert(
-        calendarId='primary',
+        calendarId='d91f7dc2fb80684b11bc5f61e7a1d2a14dae6f9ccb2dad75f37610173f9d24a6@group.calendar.google.com',
         body=event
     ).execute()
 
