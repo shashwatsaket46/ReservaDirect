@@ -20,8 +20,8 @@ import httpx
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 
-from agent import get_agent
-from config import get_settings
+from agent.agent import get_agent
+from agent.config import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

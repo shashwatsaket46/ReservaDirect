@@ -7,7 +7,7 @@ Returns confirmation_id on success, or status="not_found" to trigger Branch B.
 import logging
 from typing import Any
 
-from config import get_settings
+from agent.config import get_settings
 
 logger = logging.getLogger(__name__)
 

@@ -34,8 +34,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from config import get_settings
-from webhooks.whatsapp import router as whatsapp_router
+from agent.config import get_settings
+from agent.webhooks.whatsapp import router as whatsapp_router
 from payments.stripe_webhook import router as stripe_router
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
@@ -224,7 +224,7 @@ async def handle_message(req: MessageRequest):
     ElevenLabs calls this, waits for the reply, then sends it to the user.
     Must respond within response_timeout_secs (20s configured in ElevenLabs).
     """
-    from agent import get_agent
+    from agent.agent import get_agent
     from webhooks.whatsapp import _fetch_user_context
 
     agent = get_agent()
@@ -266,7 +266,7 @@ async def dev_simulate(req: SimulateRequest):
             detail="Dev simulation only available when STUB_EXTERNAL_APIS=true",
         )
 
-    from agent import get_agent
+    from agent.agent import get_agent
     agent = get_agent()
 
     if req.session_id:
@@ -278,3 +278,9 @@ async def dev_simulate(req: SimulateRequest):
             message=req.message,
         )
         return {"reply": reply, "session_id": session_id}
+
+from agent.webhooks.google_auth import router as google_router
+app.include_router(google_router)
+
+from agent.tools.calendar_booking import router as booking_router
+app.include_router(booking_router)

@@ -30,8 +30,8 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from config import get_settings
-from tools import ALL_TOOLS, TOOL_DISPATCH
+from agent.config import get_settings
+from agent.tools import ALL_TOOLS, TOOL_DISPATCH
 
 NVIDIA_NIM_BASE_URL = "https://integrate.api.nvidia.com/v1"
 NEMOTRON_MODEL = "meta/llama-3.1-70b-instruct"

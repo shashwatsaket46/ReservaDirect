@@ -15,7 +15,7 @@ import logging
 import stripe
 from fastapi import APIRouter, Header, HTTPException, Request
 
-from config import get_settings
+from agent.config import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
