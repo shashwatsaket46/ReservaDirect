@@ -319,6 +319,68 @@ async def dev_test_call(req: TestCallRequest | None = None):
     return result
 
 
+# ─── Reservation Change Endpoints (called by calendar_listener) ───────────────
+
+class CancelCallRequest(BaseModel):
+    restaurant_name: str
+    restaurant_phone: str
+    user_name: str
+    party_size: int
+    date: str
+    time: str
+    calendar_event_id: str = ""
+
+
+@app.post("/api/cancel-reservation")
+async def cancel_reservation(req: CancelCallRequest):
+    """
+    Called by calendar_listener when a Google Calendar event is deleted/cancelled.
+    Triggers an ElevenLabs outbound call to cancel the restaurant reservation.
+    """
+    from agent.tools.booking_voice import make_cancellation_call
+    return await make_cancellation_call(
+        restaurant_name=req.restaurant_name,
+        restaurant_phone=req.restaurant_phone,
+        user_name=req.user_name,
+        party_size=req.party_size,
+        date=req.date,
+        time=req.time,
+        calendar_event_id=req.calendar_event_id,
+    )
+
+
+class UpdateCallRequest(BaseModel):
+    restaurant_name: str
+    restaurant_phone: str
+    user_name: str
+    old_party_size: int
+    new_party_size: int
+    date: str
+    time: str
+    calendar_event_id: str = ""
+    special_requests: str = ""
+
+
+@app.post("/api/update-reservation")
+async def update_reservation(req: UpdateCallRequest):
+    """
+    Called by calendar_listener when a Google Calendar event is modified.
+    Triggers an ElevenLabs outbound call to update the restaurant reservation.
+    """
+    from agent.tools.booking_voice import make_update_call
+    return await make_update_call(
+        restaurant_name=req.restaurant_name,
+        restaurant_phone=req.restaurant_phone,
+        user_name=req.user_name,
+        old_party_size=req.old_party_size,
+        new_party_size=req.new_party_size,
+        date=req.date,
+        time=req.time,
+        calendar_event_id=req.calendar_event_id,
+        special_requests=req.special_requests,
+    )
+
+
 from agent.webhooks.google_auth import router as google_router
 app.include_router(google_router)
 

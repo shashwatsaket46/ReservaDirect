@@ -133,29 +133,67 @@ async def _handle_transcription(conversation_id: str, data: dict):
         logger.warning("No pending call found for conversation_id=%s", conversation_id)
         return
 
-    if confirmed:
-        booked_time = reservation_time or call_info.get("time", "")
-        _save_reservation({
-            "conversation_id": conversation_id,
-            "restaurant_name": call_info["restaurant_name"],
-            "restaurant_address": call_info["restaurant_address"],
-            "user_name": call_info["user_name"],
-            "party_size": call_info["party_size"],
-            "reservation_date": call_info["date"],
-            "reservation_time": booked_time,
-            "reservation_made_at": reservation_made_at,
-            "calendar_event_id": call_info["calendar_event_id"],
-            "status": "confirmed",
-        })
-        _update_calendar_event(
-            event_id=call_info["calendar_event_id"],
-            restaurant_name=call_info["restaurant_name"],
-            restaurant_address=call_info["restaurant_address"],
-            booked_time=booked_time,
-        )
-    else:
-        logger.info("Not confirmed at %s — retrying next restaurant.", call_info["restaurant_name"])
-        await _retry_next_restaurant(call_info)
+    call_type = call_info.get("call_type", "reservation")
+
+    if call_type == "cancellation":
+        if confirmed:
+            logger.info("Cancellation confirmed at %s", call_info["restaurant_name"])
+            _save_reservation({
+                "conversation_id": conversation_id,
+                "restaurant_name": call_info["restaurant_name"],
+                "user_name": call_info["user_name"],
+                "party_size": call_info["party_size"],
+                "reservation_date": call_info["date"],
+                "reservation_time": call_info["time"],
+                "reservation_made_at": reservation_made_at,
+                "calendar_event_id": call_info["calendar_event_id"],
+                "status": "cancelled",
+            })
+        else:
+            logger.warning("Cancellation NOT confirmed at %s — manual follow-up may be needed.", call_info["restaurant_name"])
+
+    elif call_type == "update":
+        if confirmed:
+            logger.info("Update confirmed at %s", call_info["restaurant_name"])
+            _save_reservation({
+                "conversation_id": conversation_id,
+                "restaurant_name": call_info["restaurant_name"],
+                "user_name": call_info["user_name"],
+                "party_size": call_info["party_size"],
+                "old_party_size": call_info.get("old_party_size"),
+                "reservation_date": call_info["date"],
+                "reservation_time": call_info["time"],
+                "reservation_made_at": reservation_made_at,
+                "calendar_event_id": call_info["calendar_event_id"],
+                "status": "updated",
+            })
+        else:
+            logger.warning("Update NOT confirmed at %s — manual follow-up may be needed.", call_info["restaurant_name"])
+
+    else:  # reservation (default)
+        if confirmed:
+            booked_time = reservation_time or call_info.get("time", "")
+            _save_reservation({
+                "conversation_id": conversation_id,
+                "restaurant_name": call_info["restaurant_name"],
+                "restaurant_address": call_info["restaurant_address"],
+                "user_name": call_info["user_name"],
+                "party_size": call_info["party_size"],
+                "reservation_date": call_info["date"],
+                "reservation_time": booked_time,
+                "reservation_made_at": reservation_made_at,
+                "calendar_event_id": call_info["calendar_event_id"],
+                "status": "confirmed",
+            })
+            _update_calendar_event(
+                event_id=call_info["calendar_event_id"],
+                restaurant_name=call_info["restaurant_name"],
+                restaurant_address=call_info["restaurant_address"],
+                booked_time=booked_time,
+            )
+        else:
+            logger.info("Not confirmed at %s — retrying next restaurant.", call_info["restaurant_name"])
+            await _retry_next_restaurant(call_info)
 
 
 # ─── Handler: Call Initiation Failure ─────────────────────────────────────────

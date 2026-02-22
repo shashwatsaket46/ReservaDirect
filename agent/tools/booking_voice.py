@@ -177,3 +177,167 @@ async def make_reservation_call(
         "call_id": call_id,
         "message": f"Calling {restaurant_name} at {restaurant_phone} for {party_size} on {date} at {time}.",
     }
+
+
+async def make_cancellation_call(
+    restaurant_name: str,
+    restaurant_phone: str,
+    user_name: str,
+    party_size: int,
+    date: str,
+    time: str,
+    calendar_event_id: str = "",
+) -> dict[str, Any]:
+    """
+    Call the restaurant to cancel an existing reservation.
+    Triggered when a Google Calendar event is deleted/cancelled.
+    """
+    cfg = get_settings()
+    api_key = cfg.check_key("elevenlabs_api_key")
+    voice_agent_id = cfg.check_key("elevenlabs_voice_agent_id")
+
+    system_prompt = (
+        f"You are ReservaDirect, an AI assistant calling to cancel a restaurant reservation. "
+        f"The reservation is for {party_size} {'person' if party_size == 1 else 'people'} "
+        f"under the name '{user_name}' on {date} at {time}. "
+        "Politely ask them to cancel it. Confirm they have cancelled it and thank them. "
+        "Always be concise — the full call should be under 60 seconds. "
+        "Never claim to be a human."
+    )
+
+    payload = {
+        "agent_id": voice_agent_id,
+        "to_number": restaurant_phone,
+        "conversation_config_override": {
+            "agent": {
+                "prompt": {"prompt": system_prompt},
+                "first_message": (
+                    f"Hi, I'm an AI assistant calling to cancel a reservation. "
+                    f"It's under the name {user_name} for {party_size} "
+                    f"{'person' if party_size == 1 else 'people'} on {date} at {time}. "
+                    "Could you please cancel that for us?"
+                ),
+            }
+        },
+    }
+
+    phone_number_id = getattr(cfg, "elevenlabs_phone_number_id", "") or ""
+    if phone_number_id:
+        payload["agent_phone_number_id"] = phone_number_id
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            "https://api.elevenlabs.io/v1/convai/twilio/outbound-call",
+            json=payload,
+            headers={"xi-api-key": api_key},
+        )
+        if not resp.is_success:
+            logger.error("ElevenLabs cancellation-call error %s: %s", resp.status_code, resp.text)
+        resp.raise_for_status()
+        data = resp.json()
+
+    call_id = data.get("conversation_id") or data.get("call_id") or data.get("callSid", "")
+    if call_id:
+        pending_calls[call_id] = {
+            "call_type": "cancellation",
+            "calendar_event_id": calendar_event_id,
+            "restaurant_name": restaurant_name,
+            "restaurant_address": "",
+            "date": date,
+            "time": time,
+            "user_name": user_name,
+            "party_size": party_size,
+            "result_index": 0,
+            "event_description": "",
+        }
+        logger.info("Cancellation call initiated: %s → %s", call_id, restaurant_name)
+
+    return {
+        "status": "cancellation_call_initiated",
+        "call_id": call_id,
+        "message": f"Calling {restaurant_name} to cancel reservation for {user_name} on {date} at {time}.",
+    }
+
+
+async def make_update_call(
+    restaurant_name: str,
+    restaurant_phone: str,
+    user_name: str,
+    old_party_size: int,
+    new_party_size: int,
+    date: str,
+    time: str,
+    calendar_event_id: str = "",
+    special_requests: str = "",
+) -> dict[str, Any]:
+    """
+    Call the restaurant to update an existing reservation (e.g. party size changed).
+    Triggered when a Google Calendar event is modified.
+    """
+    cfg = get_settings()
+    api_key = cfg.check_key("elevenlabs_api_key")
+    voice_agent_id = cfg.check_key("elevenlabs_voice_agent_id")
+
+    changes = f"the party size from {old_party_size} to {new_party_size}"
+    system_prompt = (
+        f"You are ReservaDirect, an AI assistant calling to update a restaurant reservation. "
+        f"The existing reservation is for '{user_name}' on {date} at {time}. "
+        f"You need to change {changes}. "
+        + (f"Also relay this special request: {special_requests}. " if special_requests else "")
+        + "Confirm the restaurant has updated the reservation and thank them. "
+        "Always be concise — under 60 seconds. Never claim to be a human."
+    )
+
+    payload = {
+        "agent_id": voice_agent_id,
+        "to_number": restaurant_phone,
+        "conversation_config_override": {
+            "agent": {
+                "prompt": {"prompt": system_prompt},
+                "first_message": (
+                    f"Hi, I'm an AI assistant calling to update a reservation. "
+                    f"It's under {user_name} on {date} at {time}. "
+                    f"We need to change the party size from {old_party_size} to {new_party_size}. "
+                    "Can you update that for us?"
+                ),
+            }
+        },
+    }
+
+    phone_number_id = getattr(cfg, "elevenlabs_phone_number_id", "") or ""
+    if phone_number_id:
+        payload["agent_phone_number_id"] = phone_number_id
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            "https://api.elevenlabs.io/v1/convai/twilio/outbound-call",
+            json=payload,
+            headers={"xi-api-key": api_key},
+        )
+        if not resp.is_success:
+            logger.error("ElevenLabs update-call error %s: %s", resp.status_code, resp.text)
+        resp.raise_for_status()
+        data = resp.json()
+
+    call_id = data.get("conversation_id") or data.get("call_id") or data.get("callSid", "")
+    if call_id:
+        pending_calls[call_id] = {
+            "call_type": "update",
+            "calendar_event_id": calendar_event_id,
+            "restaurant_name": restaurant_name,
+            "restaurant_address": "",
+            "date": date,
+            "time": time,
+            "user_name": user_name,
+            "party_size": new_party_size,
+            "old_party_size": old_party_size,
+            "result_index": 0,
+            "event_description": "",
+        }
+        logger.info("Update call initiated: %s → %s", call_id, restaurant_name)
+
+    return {
+        "status": "update_call_initiated",
+        "call_id": call_id,
+        "message": f"Calling {restaurant_name} to update reservation for {user_name}: party {old_party_size}→{new_party_size} on {date} at {time}.",
+    }

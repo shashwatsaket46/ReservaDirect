@@ -1,14 +1,22 @@
+import logging
+
 from fastapi import APIRouter, Request, BackgroundTasks
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import pickle
 from datetime import datetime
 
+from agent.tools.restaurant_search import search_restaurant
+from agent.tools.booking_voice import make_reservation_call
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+CALENDAR_ID = "d91f7dc2fb80684b11bc5f61e7a1d2a14dae6f9ccb2dad75f37610173f9d24a6@group.calendar.google.com"
+
 # ---------------- GLOBAL MEMORY ----------------
 sync_token = None
+processed_event_ids: set = set()
 
 @router.post("/calendar/webhook")
 async def calendar_webhook(request: Request):
