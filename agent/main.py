@@ -9,9 +9,8 @@ Endpoints:
   POST /webhook/stripe                 — Stripe payment events
   POST /dev/simulate                   — Dev-only: simulate a WhatsApp message
 
-Run:
-  cd agent
-  uvicorn main:app --reload --port 8000
+Run (from Buildathon/ root):
+  uvicorn agent.main:app --reload --port 8001
 
 Expose to internet (for webhooks) via ngrok:
   ngrok http 8000
@@ -35,8 +34,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from agent.config import get_settings
-from agent.webhooks.whatsapp import router as whatsapp_router
-from payments.stripe_webhook import router as stripe_router
+# from agent.webhooks.whatsapp import router as whatsapp_router  # DISABLED: WhatsApp chatbot replaced by Google Calendar flow
+# from payments.stripe_webhook import router as stripe_router    # DISABLED: Stripe deposit flow not used in calendar integration
+from agent.webhooks.elevenlabs_call import router as elevenlabs_call_router
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 
@@ -98,8 +98,9 @@ app.add_middleware(
 )
 
 # Mount routers
-app.include_router(whatsapp_router)
-app.include_router(stripe_router)
+# app.include_router(whatsapp_router)  # DISABLED: WhatsApp chatbot flow
+# app.include_router(stripe_router)    # DISABLED: Stripe deposit flow
+app.include_router(elevenlabs_call_router)  # ElevenLabs post-call results
 
 
 # ─── Core Endpoints ───────────────────────────────────────────────────────────
@@ -225,7 +226,7 @@ async def handle_message(req: MessageRequest):
     Must respond within response_timeout_secs (20s configured in ElevenLabs).
     """
     from agent.agent import get_agent
-    from webhooks.whatsapp import _fetch_user_context
+    from agent.webhooks.whatsapp import _fetch_user_context
 
     agent = get_agent()
 
@@ -278,6 +279,45 @@ async def dev_simulate(req: SimulateRequest):
             message=req.message,
         )
         return {"reply": reply, "session_id": session_id}
+
+# ─── Dev: Trigger a test voice call ──────────────────────────────────────────
+
+class TestCallRequest(BaseModel):
+    restaurant_name: str = "Himalayan Restaurant"
+    restaurant_phone: str = "+18624365501"
+    user_name: str = "Demo User"
+    party_size: int = 11
+    date: str = "21/Feb/2026"
+    time: str = "7:00 PM"
+    restaurant_address: str = "123 Demo St, New York, NY"
+    calendar_event_id: str = "demo-event-001"
+
+
+@app.post("/dev/test-call")
+async def dev_test_call(req: TestCallRequest | None = None):
+    """
+    Directly trigger an ElevenLabs outbound voice call with custom data.
+    No STUB_EXTERNAL_APIS restriction — fires a real call.
+    """
+    if req is None:
+        req = TestCallRequest()
+    from agent.tools.booking_voice import make_reservation_call
+    result = await make_reservation_call(
+        restaurant_name=req.restaurant_name,
+        restaurant_phone=req.restaurant_phone,
+        user_name=req.user_name,
+        party_size=req.party_size,
+        date=req.date,
+        time=req.time,
+        restaurant_address=req.restaurant_address,
+        calendar_event_id=req.calendar_event_id,
+        result_index=0,
+        event_description=(
+            f"Location: New York\nCuisine: Himalayan\nGuests: {req.party_size}"
+        ),
+    )
+    return result
+
 
 from agent.webhooks.google_auth import router as google_router
 app.include_router(google_router)

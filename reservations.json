@@ -1,0 +1,14 @@
+[
+  {
+    "conversation_id": "conv_0501kj1gzc5jezab6abampfh17by",
+    "restaurant_name": "Himalayan Restaurant",
+    "restaurant_address": "123 Demo St, New York, NY",
+    "user_name": "Demo User",
+    "party_size": 11,
+    "reservation_date": "21/Feb/2026",
+    "reservation_time": "7:00 PM",
+    "reservation_made_at": "2026-02-21 20:57:19 EST",
+    "calendar_event_id": "demo-event-001",
+    "status": "confirmed"
+  }
+]

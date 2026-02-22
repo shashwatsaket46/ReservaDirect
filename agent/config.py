@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     elevenlabs_agent_id: str = ""
     elevenlabs_voice_agent_id: str = ""
+    elevenlabs_webhook_secret: str = ""   # From ElevenLabs → Agents → Settings → Post-call webhook
+    elevenlabs_phone_number_id: str = ""  # ElevenLabs Phone Number ID (e.g. PhNum_xxxx) — get from Conversational AI → Phone Numbers
 
     # Twilio
     twilio_account_sid: str = ""
