@@ -1,4 +1,3 @@
-from .restaurant_search import search_restaurant, SEARCH_RESTAURANT_SCHEMA
 from .booking_digital import book_digital, BOOK_DIGITAL_SCHEMA
 from .booking_voice import make_reservation_call, MAKE_RESERVATION_CALL_SCHEMA
 from .payment_auth import request_payment_auth, REQUEST_PAYMENT_AUTH_SCHEMA
@@ -22,7 +21,6 @@ def _to_openai(schema: dict) -> dict:
 
 
 ALL_TOOLS = [
-    _to_openai(SEARCH_RESTAURANT_SCHEMA),
     _to_openai(BOOK_DIGITAL_SCHEMA),
     _to_openai(MAKE_RESERVATION_CALL_SCHEMA),
     _to_openai(REQUEST_PAYMENT_AUTH_SCHEMA),
@@ -31,7 +29,6 @@ ALL_TOOLS = [
 ]
 
 TOOL_DISPATCH = {
-    "search_restaurant": search_restaurant,
     "book_digital": book_digital,
     "make_reservation_call": make_reservation_call,
     "request_payment_auth": request_payment_auth,
