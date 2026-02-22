@@ -148,6 +148,7 @@ def process_calendar_events():
                     nearby = get_nearby_restaurants(location)
                     restaurants = nearby.get("restaurants", [])
                     if restaurants:
+
                         best = restaurants[0]
                         booking_json.update({
                             "restaurant_name": best.get("name"),
