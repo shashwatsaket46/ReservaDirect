@@ -2,52 +2,57 @@ from fastapi import APIRouter, Request, BackgroundTasks
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import pickle
-from datetime import datetime
+from datetime import datetime, timezone
+from dateutil import parser
+from agent.tools.reservation_parser import parse_reservation
+from agent.tools.restaurant_search import get_nearby_restaurants
+from agent.db.booking_repo import (
+    get_sync_token, save_sync_token, clear_sync_token,
+    upsert_booking, cancel_booking
+)
+import json
+import threading
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
-# ---------------- GLOBAL MEMORY ----------------
-sync_token = None
+CALENDAR_ID = "d91f7dc2fb80684b11bc5f61e7a1d2a14dae6f9ccb2dad75f37610173f9d24a6@group.calendar.google.com"
+_sync_lock = threading.Lock()
+
+# ---------------- WEBHOOK ENTRY ----------------
 
 @router.post("/calendar/webhook")
-async def calendar_webhook(request: Request):
-
-    global sync_token
-
+async def calendar_webhook(request: Request, bg: BackgroundTasks):
+    print("[WEBHOOK] Received notification")
     headers = request.headers
     resource_state = headers.get("x-goog-resource-state")
 
-    # Google handshake event
     if resource_state == "sync":
         print("Google Handshake Received")
         return {"msg": "Sync acknowledged"}
 
-    # Ignore deletes / updates
     if resource_state != "exists":
         return {"msg": "Ignored"}
 
-    # Run heavy sync in background
     bg.add_task(process_calendar_events)
-
     return {"status": "received"}
 
 
 # ---------------- BACKGROUND SYNC ----------------
-
+clear_sync_token()
 def process_calendar_events():
-
-    global sync_token
-    global processed_event_ids
-
-    with open("token.pickle", "rb") as token:
-        creds = pickle.load(token)
-
-    service = build("calendar", "v3", credentials=creds)
-
+    if not _sync_lock.acquire(blocking=False):
+        print("[SYNC] Already running, skipping duplicate.")
+        return
     try:
+        print("[SYNC] process_calendar_events started")
 
-        # Initial sync OR delta sync
+        with open("token.pickle", "rb") as token:
+            creds = pickle.load(token)
+
+        service = build("calendar", "v3", credentials=creds)
+        sync_token = get_sync_token()
+
+        # 1. Fetch Events
         if sync_token is None:
             events_result = service.events().list(
                 calendarId=CALENDAR_ID,
@@ -60,96 +65,104 @@ def process_calendar_events():
                 syncToken=sync_token
             ).execute()
 
+        # 2. IMMEDIATE CHECKPOINT
+        # We save the token NOW so that if a new webhook hits while we are
+        # doing slow AI work, it won't fetch these same events again.
+        new_sync_token = events_result.get("nextSyncToken")
+        if new_sync_token:
+            save_sync_token(new_sync_token)
+            print(f"[SYNC] Checkpoint saved: {new_sync_token}")
+
         events = events_result.get("items", [])
-        sync_token = events_result.get("nextSyncToken")
+        print(f"[SYNC] Total events to evaluate: {len(events)}")
 
         for event in events:
-
             event_id = event.get("id")
+            status = event.get("status")
 
-            # Avoid duplicate processing
-            if event_id in processed_event_ids:
+            # 3. RECENCY FILTER
+            # Ignore events that haven't been updated in the last 5 minutes.
+            # This prevents historical "sync dumps" from triggering AI calls.
+            updated_raw = event.get("updated")
+            if updated_raw:
+                event_updated_time = parser.isoparse(updated_raw)
+                now = datetime.now(timezone.utc)
+                diff = (now - event_updated_time).total_seconds()
+
+                if diff > 300: # 5 minutes
+                    print(f"[SKIP] Ignoring old event {event_id} (Updated {int(diff)}s ago)")
+                    continue
+
+            if status == "cancelled":
+                cancel_booking(event_id)
                 continue
 
-            processed_event_ids.add(event_id)
-
-            # Ignore cancelled
-            if event.get("status") != "confirmed":
+            if status != "confirmed":
                 continue
 
             if "start" not in event or "end" not in event:
                 continue
 
+            # Parsing logic
             start_raw = event["start"].get("dateTime") or event["start"].get("date")
             end_raw = event["end"].get("dateTime") or event["end"].get("date")
-
-            if not start_raw or not end_raw:
-                continue
-
             start = parser.isoparse(start_raw)
             end = parser.isoparse(end_raw)
 
-            # -------- GOOGLE NAME FALLBACK --------
-
-            creator = event.get("creator", {})
-            organizer = event.get("organizer", {})
-            attendees = event.get("attendees", [])
-
-            google_creator_name = creator.get("displayName")
-            organizer_name = organizer.get("displayName")
-
-            attendee_name = None
-            if attendees:
-                attendee_name = attendees[0].get("displayName")
-
-            fallback_name = (
-                    google_creator_name
-                    or attendee_name
-                    or organizer_name
-                    or event.get("summary")
-                    or "Unknown"
-            )
-
-            # -------- DESCRIPTION NLP --------
-
+            customer_name = event.get("summary") or event.get("creator", {}).get("email", "Unknown").split("@")[0]
             description = event.get("description", "")
 
-            parsed = {
-                "guest_name": fallback_name,
-                "phone_number": "",
-                "number_of_people": 0,
-                "special_request": ""
-            }
-
-            if description and len(description.strip()) > 10:
+            # AI Parsing (Claude)
+            parsed = {"phone_number": "", "number_of_people": 0, "price_range": "Unknown", "special_request": ""}
+            if description and len(description.strip()) > 2:
                 try:
                     claude_data = parse_reservation(description)
-                    parsed["guest_name"] = claude_data.get("guest_name") or fallback_name
-                    parsed["phone_number"] = claude_data.get("phone_number")
-                    parsed["number_of_people"] = claude_data.get("number_of_people")
-                    parsed["special_request"] = claude_data.get("special_request")
+                    parsed.update(claude_data)
                 except Exception as e:
-                    print("Claude Parse Failed:", e)
-
-            # -------- FINAL BOOKING --------
-
-            description = event.get("description", "")
+                    print(f"Claude Parse Failed: {e}")
 
             booking_json = {
-                "description": event.get("description"),
+                "event_id": event_id,
+                "guest_name": customer_name,
+                "email": event.get("creator", {}).get("email"),
+                "phone_number": parsed.get("phone_number"),
+                "price_range": parsed.get("price_range"),
+                "location": event.get("location"),
                 "date": start.strftime("%d/%b/%Y"),
                 "time": start.strftime("%H:%M"),
-                "duration_minutes": int((end-start).total_seconds()/60)
+                "duration_minutes": int((end - start).total_seconds() / 60),
+                "number_of_people": parsed.get("number_of_people"),
+                "special_request": parsed.get("special_request")
             }
 
-            print("REAL Booking:", booking_json)
-            logger.info("New calendar booking request: %s", booking_json)
+            # Restaurant Search (Google Maps)
+            location = booking_json.get("location")
+            if location:
+                try:
+                    nearby = get_nearby_restaurants(location)
+                    restaurants = nearby.get("restaurants", [])
+                    if restaurants:
+                        best = restaurants[0]
+                        booking_json.update({
+                            "restaurant_name": best.get("name"),
+                            "restaurant_phone": best.get("phone_number"),
+                            "restaurant_address": best.get("address"),
+                            "restaurant_rating": best.get("rating")
+                        })
+                except Exception as e:
+                    print(f"Restaurant Search Failed: {e}")
 
-            # Trigger reservation pipeline in background — ack Google in < 2s
-            background_tasks.add_task(_run_reservation_pipeline, booking_json)
+            # 4. ATOMIC UPSERT
+            print("Printing booking",booking_json)
+            upsert_booking(booking_json)
+            print(f"[DONE] Processed event: {event_id}")
 
-    except Exception as e:
-        print("Sync Error:", e)
-        sync_token = None
-
-    return {"status": "received"}
+    except HttpError as e:
+        if e.resp.status == 410:
+            print("Sync Token Expired → Resetting")
+            clear_sync_token()
+            process_calendar_events()
+        else:
+            print(f"Sync Error: {e}")
+    finally:
+        _sync_lock.release()

@@ -9,6 +9,28 @@ def get_gmaps_client():
 
     return googlemaps.Client(key=api_key)
 
+def get_restaurant_phone(gmaps, place_id):
+
+    try:
+        details = gmaps.place(
+            place_id=place_id,
+            fields=[
+                "name",
+                "formatted_phone_number",
+                "international_phone_number"
+            ]
+        )
+
+        result = details.get("result", {})
+
+        return (
+                result.get("international_phone_number")
+                or result.get("formatted_phone_number")
+        )
+
+    except Exception as e:
+        print("Phone Fetch Error:", e)
+        return None
 
 def get_nearby_restaurants(location: str, radius=2000):
 
@@ -45,6 +67,10 @@ def get_nearby_restaurants(location: str, radius=2000):
 
     for place in places_result.get("results", [])[:1]:
 
+        place_id = place.get("place_id")
+
+        phone = get_restaurant_phone(gmaps, place_id)
+
         restaurants.append({
             "name": place.get("name"),
             "rating": place.get("rating"),
@@ -52,7 +78,8 @@ def get_nearby_restaurants(location: str, radius=2000):
             "open_now": place.get("opening_hours", {}).get("open_now"),
             "price_level": place.get("price_level") if place.get("price_level") is not None else -1,
             "price_range": price_label(place.get("price_level")),
-            "place_id": place.get("place_id")
+            "place_id": place_id,
+            "phone_number": phone
         })
 
     return {

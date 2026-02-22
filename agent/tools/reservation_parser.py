@@ -10,23 +10,19 @@ load_dotenv(dotenv_path=env_path)
 
 def parse_reservation(description: str):
 
-    # Create Claude client ONLY when function runs
-    client = Anthropic(
-        api_key=os.getenv("ANTHROPIC_API_KEY")
-    )
-
-    print("Claude KEY INSIDE FUNC:", os.getenv("ANTHROPIC_API_KEY"))
+    client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
     prompt = f"""
 Extract reservation details from this restaurant booking message.
 
-Return ONLY valid JSON in this exact schema:
+Return ONLY valid JSON with no markdown, no code blocks, no explanation.
 
+Exact schema:
 {{
- "guest_name": "",
- "phone_number": "",
- "number_of_people": 0,
- "special_request": ""
+  "phone_number": "",
+  "number_of_people": 0,
+  "price_range": "",
+  "special_request": ""
 }}
 
 Message:
@@ -34,12 +30,19 @@ Message:
 """
 
     response = client.messages.create(
-        model="claude-3-haiku-latest",
+        model="claude-haiku-4-5",
         max_tokens=200,
         temperature=0,
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
+        messages=[{"role": "user", "content": prompt}]
     )
 
-    return json.loads(response.content[0].text)
+    raw = response.content[0].text.strip()
+
+    # Strip markdown code blocks if Claude wraps the JSON
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+
+    return json.loads(raw)
