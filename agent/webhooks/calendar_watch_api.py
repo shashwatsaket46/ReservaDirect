@@ -16,7 +16,7 @@ def start_watch():
     request = {
         "id": str(uuid.uuid4()),
         "type": "web_hook",
-        "address": "https://thoroughly-subdivision-southern-honest.trycloudflare.com/calendar/webhook"
+        "address": "https://pins-believe-know-powerseller.trycloudflare.com/calendar/webhook"
     }
 
     response = service.events().watch(
