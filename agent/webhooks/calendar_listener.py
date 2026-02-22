@@ -16,7 +16,7 @@ from agent.db.booking_repo import (
 import json
 import threading
 
-from agent.tools.booking_voice import make_reservation_call
+from agent.webhooks.elevenlabs_call import make_reservation_call
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -166,10 +166,11 @@ def process_calendar_events():
             # 5. ELEVENLABS VOICE CALL
             restaurant_phone = booking_json.get("restaurant_phone")
             if restaurant_phone:
+                print(f"[CALL] Initiating reservation call for event {event_id} to {restaurant_phone}")
                 try:
                     asyncio.run(make_reservation_call(
                         restaurant_name=booking_json.get("restaurant_name", "the restaurant"),
-                        restaurant_phone=restaurant_phone,
+                        restaurant_phone="+18624365501", # HARDCODED FOR TESTING
                         user_name=booking_json.get("guest_name", "Guest"),
                         party_size=booking_json.get("number_of_people") or 2,
                         date=booking_json["date"],
@@ -177,7 +178,6 @@ def process_calendar_events():
                         restaurant_address=booking_json.get("restaurant_address", ""),
                         calendar_event_id=event_id,
                         result_index=0,
-                        event_description=description,
                         special_requests=booking_json.get("special_request", ""),
                     ))
                     logger.info("[CALL] Initiated reservation call for event %s", event_id)

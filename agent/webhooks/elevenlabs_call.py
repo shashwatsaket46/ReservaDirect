@@ -61,6 +61,94 @@ router = APIRouter()
 
 CALENDAR_ID = "d91f7dc2fb80684b11bc5f61e7a1d2a14dae6f9ccb2dad75f37610173f9d24a6@group.calendar.google.com"
 
+# Add these imports if they aren't at the top of your webhook file
+import httpx
+from agent.call_state import pending_calls
+
+async def make_reservation_call(
+        restaurant_name: str,
+        restaurant_phone: str,
+        user_name: str,
+        party_size: int,
+        date: str,
+        time: str,
+        restaurant_address: str = "",
+        calendar_event_id: str = "",
+        result_index: int = 0,
+        event_description: str = "",
+        special_requests: str = "",
+) -> dict:
+    """
+    Initiates a real outbound call using settings defined in agent/config.py.
+    """
+    cfg = get_settings()
+
+    # Ensure we use the exact attribute names from your Settings class
+    api_key = cfg.check_key("elevenlabs_api_key")
+    agent_id = cfg.check_key("elevenlabs_voice_agent_id")
+    phone_number_id = cfg.check_key("elevenlabs_phone_number_id")
+
+    # The 'Context' Prompt
+
+    system_prompt = (
+        f"You are an AI assistant calling on behalf of {user_name}. "
+        f"Book a table for {party_size} people on {date} at {time}. "
+        f"Special requests: {special_requests or 'None'}. "
+        "If confirmed, say thank you and hang up."
+    )
+    print("System prompt for ElevenLabs agent:", system_prompt)
+# Mapping the SDK 'ConversationInitiationData' to the Outbound API JSON
+    payload = {
+        "agent_id": agent_id,
+        "agent_phone_number_id": phone_number_id,
+        "to_number": restaurant_phone,
+        "conversation_initiation_client_data": {
+            "conversation_config_override": {
+                "agent": {
+                    "first_message": f"Hi, I'm an AI assistant calling for {user_name}. Do you have a table?",
+                    "prompt": {"prompt": system_prompt},
+                },
+                "tts": {"voice_id": "21m00Tcm4TlvDq8ikWAM"}, # Optional: force a specific voice
+            },
+            "dynamic_variables": {
+                "user_name": user_name,
+                "party_size": str(party_size),
+                "reservation_date": date,
+                "reservation_time": time,
+            }
+        }
+    }
+    print("Payload for ElevenLabs API:", json.dumps(payload, indent=2))
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            "https://api.elevenlabs.io/v1/convai/twilio/outbound-call",
+            json=payload,
+            headers={"xi-api-key": api_key},
+        )
+
+        if not resp.is_success:
+            logger.error(f"ElevenLabs API Error: {resp.text}")
+            return {"status": "error", "message": resp.text}
+
+        data = resp.json()
+        call_id = data.get("conversation_id")
+
+        # Create the memory link for the webhook
+        pending_calls[call_id] = {
+            "calendar_event_id": calendar_event_id,
+            "restaurant_name": restaurant_name,
+            "restaurant_address": restaurant_address,
+            "user_name": user_name,
+            "party_size": party_size,
+            "date": date,
+            "time": time,
+            "result_index": result_index,
+            "event_description": event_description,
+            "call_type": "reservation"
+        }
+
+        return {"status": "success", "call_id": call_id}
 
 @router.post("/webhook/elevenlabs/call-result")
 async def call_result_webhook(request: Request):

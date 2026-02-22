@@ -5,6 +5,23 @@ import uuid
 
 router = APIRouter()
 
+def watch_user_calendar(creds, calendar_id):
+
+    service = build("calendar", "v3", credentials=creds)
+
+    request = {
+        "id": str(uuid.uuid4()),
+        "type": "web_hook",
+        "address": "https://pins-believe-know-powerseller.trycloudflare.com/calendar/webhook"
+    }
+
+    response = service.events().watch(
+        calendarId=calendar_id,
+        body=request
+    ).execute()
+
+    return response
+
 @router.get("/calendar/start-watch")
 def start_watch():
 

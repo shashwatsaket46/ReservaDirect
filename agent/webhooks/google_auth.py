@@ -4,6 +4,9 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 from fastapi import APIRouter, Request
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from agent.tools.calendar_booking import create_restaurant_calendar
+from agent.webhooks.calendar_watch_api import watch_user_calendar
+from agent.db.booking_repo import save_user_google_data
 import pickle
 
 router = APIRouter()
@@ -46,15 +49,18 @@ async def google_callback(request: Request):
     )
 
     creds = flow.credentials
+    calendar_id = create_restaurant_calendar(creds)
 
-    with open("token.pickle", "wb") as token:
-        pickle.dump(creds, token)
+    watch_response = watch_user_calendar(creds, calendar_id)
 
-    service = build("calendar", "v3", credentials=creds)
-
-    calendars = service.calendarList().list().execute()
+    save_user_google_data({
+        "refresh_token": creds.refresh_token,
+        "calendar_id": calendar_id,
+        "resource_id": watch_response["resourceId"],
+        "channel_id": watch_response["id"]
+    })
 
     return {
-        "status": "Google Auth Successful",
-        "calendars": [c['summary'] for c in calendars['items']]
+        "status": "Restaurant Booking Calendar Created",
+        "calendar_id": calendar_id
     }

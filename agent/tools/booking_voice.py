@@ -18,6 +18,13 @@ from typing import Any
 from agent.config import get_settings
 from agent.call_state import pending_calls
 
+import os
+import logging
+from typing import Any
+from elevenlabs.client import ElevenLabs
+from agent.config import get_settings
+from agent.call_state import pending_calls
+
 logger = logging.getLogger(__name__)
 
 MAKE_RESERVATION_CALL_SCHEMA = {
@@ -48,29 +55,27 @@ MAKE_RESERVATION_CALL_SCHEMA = {
 
 
 async def make_reservation_call(
-    restaurant_name: str,
-    restaurant_phone: str,
-    user_name: str,
-    party_size: int,
-    date: str,
-    time: str,
-    restaurant_address: str = "",
-    calendar_event_id: str = "",
-    result_index: int = 0,
-    event_description: str = "",
-    special_requests: str = "",
+        restaurant_name: str,
+        restaurant_phone: str,
+        user_name: str,
+        party_size: int,
+        date: str,
+        time: str,
+        restaurant_address: str = "",
+        calendar_event_id: str = "",
+        result_index: int = 0,
+        event_description: str = "",
+        special_requests: str = "",
 ) -> dict[str, Any]:
     """
     Initiate an outbound ElevenLabs voice call to a restaurant.
-
-    Stores call metadata in pending_calls so the post-call webhook can
-    map the result back to the correct Google Calendar event.
-
-    Returns immediately with call_id — the actual result arrives
-    asynchronously via /webhook/elevenlabs/call-result.
     """
     cfg = get_settings()
 
+    # 1. Logging for debugging
+    logger.info(f"Initiating call: {restaurant_name} ({restaurant_phone}) for {user_name}")
+
+    # 2. Handle the Testing Stub
     if cfg.stub_external_apis:
         fake_call_id = f"STUB-CALL-{restaurant_name[:6].upper()}"
         pending_calls[fake_call_id] = {
@@ -89,6 +94,60 @@ async def make_reservation_call(
             "call_id": fake_call_id,
             "message": f"[STUB] Voice agent calling {restaurant_name} at {restaurant_phone}",
         }
+
+    # 3. Real ElevenLabs Outbound Call Logic
+    try:
+        phone_id = os.getenv("ELEVENLABS_PHONE_ID")
+        if not phone_id:
+            logger.error("ELEVENLABS_PHONE_ID is missing from environment variables!")
+            return {"status": "error", "message": "Missing Phone Number ID"}
+
+        client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
+
+        response = client.conversational_ai.twilio.outbound_call(
+            agent_id=os.getenv("ELEVENLABS_AGENT_ID"),
+            # Ensure this key matches exactly what the API expects
+            agent_phone_number_id=phone_id,
+            to_number=restaurant_phone,
+            conversation_initiation_client_data={
+                "dynamic_variables": {
+                    "user_name": user_name,
+                    "restaurant_name": restaurant_name,
+                    "party_size": str(party_size),
+                    "reservation_date": date,
+                    "reservation_time": time,
+                    "special_requests": special_requests or "None"
+                }
+            }
+        )
+        print(f"DEBUG: ElevenLabs Response: {response}")
+
+        # The ID ElevenLabs uses to track the conversation
+        conversation_id = response.conversation_id
+
+        # Store metadata for the webhook handler to find later
+        pending_calls[conversation_id] = {
+            "calendar_event_id": calendar_event_id,
+            "restaurant_name": restaurant_name,
+            "restaurant_address": restaurant_address,
+            "date": date,
+            "time": time,
+            "user_name": user_name,
+            "party_size": party_size,
+            "result_index": result_index,
+            "event_description": event_description,
+            "call_type": "reservation"
+        }
+
+        return {
+            "status": "call_initiated",
+            "call_id": conversation_id,
+            "message": f"Real voice call initiated to {restaurant_name}"
+        }
+
+    except Exception as e:
+        logger.error(f"ElevenLabs Call Failed: {e}")
+        return {"status": "error", "message": str(e)}
 
     api_key = cfg.check_key("elevenlabs_api_key")
     voice_agent_id = cfg.check_key("elevenlabs_voice_agent_id")

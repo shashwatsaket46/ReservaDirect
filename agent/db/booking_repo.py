@@ -60,3 +60,13 @@ def get_booking(event_id: str) -> dict | None:
 
 def get_all_bookings() -> list:
     return list(bookings_collection.find({"status": "confirmed"}, {"_id": 0}))
+from agent.db.mongo import db
+
+def save_user_google_data(data):
+
+    db.users.insert_one({
+        "google_refresh_token": data["refresh_token"],
+        "restaurant_calendar_id": data["calendar_id"],
+        "watch_resource_id": data["resource_id"],
+        "watch_channel_id": data["channel_id"]
+    })

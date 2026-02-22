@@ -29,11 +29,11 @@ def book_table(
         "description": description,
         "start": {
             "dateTime": start_datetime.isoformat(),
-            "timeZone": "Asia/Kolkata"
+            "timeZone": "US/Pacific"
         },
         "end": {
             "dateTime": end_datetime.isoformat(),
-            "timeZone": "Asia/Kolkata"
+            "timeZone": "US/Pacific"
         }
     }
 
@@ -46,3 +46,18 @@ def book_table(
         "status": "Booking Confirmed",
         "event_link": created_event.get("htmlLink")
     }
+
+def create_restaurant_calendar(creds):
+
+    service = build("calendar", "v3", credentials=creds)
+
+    calendar_body = {
+        "summary": "Restaurant Booking",
+        "timeZone": "America/New_York"
+    }
+
+    created_calendar = service.calendars().insert(
+        body=calendar_body
+    ).execute()
+
+    return created_calendar["id"]
