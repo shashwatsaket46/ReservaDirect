@@ -19,17 +19,19 @@ What if your calendar could act as your personal concierge and make calls on you
 The reserva direct website looks like this where you can create your account and then add the calender required for further processing.
 <img width="980" height="522" alt="image" src="https://github.com/user-attachments/assets/c8974664-7aea-41fe-bd92-2f5acc3fb60b" />
 <img width="978" height="465" alt="image" src="https://github.com/user-attachments/assets/cacee935-8288-4757-b908-f7d275010d2a" />
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/1446a9b1-8f63-4c89-a27c-632679371b54" width="250"/>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="https://github.com/user-attachments/assets/d215c2ae-244e-4401-a085-696168961cba" width="250"/>
-</p>
+<table align="center">
+<tr>
+<td align="center" valign="top">
+<img src="https://github.com/user-attachments/assets/1446a9b1-8f63-4c89-a27c-632679371b54" width="250"/><br/>
+<b>Calendar Event Input</b>
+</td>
 
-<p align="center">
-  <b>Calendar Event Input</b>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <b>Reservation Confirmation</b>
-</p>
+<td align="center" valign="top">
+<img src="https://github.com/user-attachments/assets/d215c2ae-244e-4401-a085-696168961cba" width="250"/><br/>
+<b>Reservation Confirmation</b>
+</td>
+</tr>
+</table>
 
 
 ## ✨ What It Does
@@ -152,6 +154,7 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 
 Once running locally:
+
 
 
 
