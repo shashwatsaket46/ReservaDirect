@@ -69,4 +69,71 @@ Calendar updates or cancellations trigger follow-up calls automatically.
 
 ## ⚙️ API Endpoints
 
+
+Available endpoints include:
+
+- `/google/login`
+- `/calendar/book`
+- `/calendar/webhook`
+- `/api/setup-intent`
+- `/api/message`
+- `/api/cancel-reservation`
+- `/webhook/elevenlabs/call-result`
+
+---
+
+## 🧩 Challenges
+
+- Handling duplicate Google webhook notifications  
+- Preventing reservation calls during event edits  
+- Managing async voice workflows with real-time calendar sync  
+- Building reliable booking stabilization logic  
+
+---
+
+## 🏆 Accomplishments
+
+- End-to-end reservation workflow  
+- Works without requiring restaurants to join any platform  
+- Automated make / update / cancel reservations  
+- Global compatibility using phone calls  
+
+---
+
+## 📚 What We Learned
+
+- Designing webhook-driven systems  
+- Async orchestration for real-world automation  
+- ML-ready ranking pipelines  
+- Integrating AI voice agents into live workflows  
+
+---
+
+## 🛠️ Built With
+
+- FastAPI  
+- Anthropic Claude  
+- ElevenLabs  
+- Databricks  
+- MongoDB  
+- Google Calendar API  
+- Lovable  
+
+---
+
+## 🖥️ Demo UI
+
+https://calendar-ai-reservations.lovable.app/
+
+---
+
+## 📦 Getting Started
+
+```bash
+git clone https://github.com/shashwatsaket46/ReservaDirect.git
+cd ReservaDirect
+pip install -r requirements.txt
+uvicorn main:app --reload
+
 Once running locally:
+
