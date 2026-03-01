@@ -320,7 +320,11 @@ async def dev_test_call(req: TestCallRequest | None = None):
 
 
 # ─── Reservation Change Endpoints (called by calendar_listener) ───────────────
+from agent.db.mongo import init_mongo
 
+@app.on_event("startup")
+async def startup_event():
+    init_mongo()
 class CancelCallRequest(BaseModel):
     restaurant_name: str
     restaurant_phone: str

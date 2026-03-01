@@ -44,7 +44,6 @@ async def calendar_webhook(request: Request, bg: BackgroundTasks):
 
 
 # ---------------- BACKGROUND SYNC ----------------
-clear_sync_token()
 def process_calendar_events():
     if not _sync_lock.acquire(blocking=False):
         print("[SYNC] Already running, skipping duplicate.")
@@ -190,7 +189,6 @@ def process_calendar_events():
     except HttpError as e:
         if e.resp.status == 410:
             print("Sync Token Expired → Resetting")
-            clear_sync_token()
             process_calendar_events()
         else:
             print(f"Sync Error: {e}")

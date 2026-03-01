@@ -12,7 +12,7 @@ def watch_user_calendar(creds, calendar_id):
     request = {
         "id": str(uuid.uuid4()),
         "type": "web_hook",
-        "address": "https://pins-believe-know-powerseller.trycloudflare.com/calendar/webhook"
+        "address": "https://loose-occupied-aquarium-men.trycloudflare.com/calendar/webhook"
     }
 
     response = service.events().watch(
@@ -33,7 +33,7 @@ def start_watch():
     request = {
         "id": str(uuid.uuid4()),
         "type": "web_hook",
-        "address": "https://pins-believe-know-powerseller.trycloudflare.com/calendar/webhook"
+        "address": "https://loose-occupied-aquarium-men.trycloudflare.com/calendar/webhook"
     }
 
     response = service.events().watch(
