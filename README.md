@@ -16,6 +16,15 @@ What if your calendar could act as your personal concierge and make calls on you
 
 ---
 
+The reserva direct website looks like this where you can create your account and then add the calender required for further processing.
+<img width="980" height="522" alt="image" src="https://github.com/user-attachments/assets/c8974664-7aea-41fe-bd92-2f5acc3fb60b" />
+<img width="978" height="465" alt="image" src="https://github.com/user-attachments/assets/cacee935-8288-4757-b908-f7d275010d2a" />
+The input can be done using the google calendar and make your booking like this.
+<img width="202" height="714" alt="image" src="https://github.com/user-attachments/assets/1446a9b1-8f63-4c89-a27c-632679371b54" />
+THe reservation confirmation would be displayed in google calendar like this once it has been confirmed from the restaurant which is obtained after an AI call to the restaurant.
+<img width="322" height="719" alt="image" src="https://github.com/user-attachments/assets/d215c2ae-244e-4401-a085-696168961cba" />
+
+
 ## ✨ What It Does
 
 ReservaDirect transforms Google Calendar into an automated restaurant reservation assistant.
@@ -136,4 +145,5 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 
 Once running locally:
+
 
